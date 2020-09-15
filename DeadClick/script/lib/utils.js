@@ -75,15 +75,15 @@ function cleanRequestURL(url) {
  * @param url
  * @returns {Promise<State>}
  */
-async function loadState(url) {
+async function loadState(url, requestsPath = module.exports.requestsPath) {
     // if md5 of the url
-    if (!await fs.exists(module.exports.requestsPath + url)) {
+    if (!await fs.exists(requestsPath + url)) {
         url = md5(url);
     }
-    if (!await fs.exists(module.exports.requestsPath + url)) {
+    if (!await fs.exists(requestsPath + url)) {
         return null;
     }
-    const data = JSON.parse(await fs.readTextFile(module.exports.requestsPath + url + '/request.json'));
+    const data = JSON.parse(await fs.readTextFile(requestsPath + url + '/request.json'));
     const state = new State(data.id, data.url);
     state.errors = data.errors.map(e => {
         const error = new Error();

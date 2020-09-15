@@ -90,7 +90,7 @@ class Proxy {
  *
  * @returns {Promise<Proxy>}
  */
-async function startProxy(port) {
+async function startProxy(port, requestsPath = utils.requestsPath) {
     const output = new Proxy();
     if (!port) {
         port = output.port;
@@ -153,7 +153,7 @@ async function startProxy(port) {
                             }
                         }
                     }
-                    const data = await fs.readFile(utils.requestsPath + output.requestState.id + "/" + r.id);
+                    const data = await fs.readFile(requestsPath + output.requestState.id + "/" + r.id);
 
                     await delay(100)
 

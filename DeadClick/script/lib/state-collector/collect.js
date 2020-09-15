@@ -39,30 +39,22 @@ async function onPageError(e) {
     return error;
 }
 
-async function saveRequest(request) {
-    let requestPath = utils.requestsPath + request.id;
-    if (request.errors.length === 0) {
-        requestPath = utils.requestsPath + '../no-error/' + request.id;
-        await fs.delete(request.screenshot);
-    }
+async function saveRequest(request, requestsPath = utils.requestsPath) {
+    const requestPath = requestsPath + request.id;
     await fs.createDirectory(requestPath);
 
     for (let i = 0; i < request.requests.length; i++) {
         const r = request.requests[i];
         delete r.used;
 
-        if (request.errors.length > 0) {
-            await fs.writeFile(requestPath + '/' + r.id, r.body);
-        }
+        await fs.writeFile(requestPath + '/' + r.id, r.body);
         delete r.body;
     }
-    if (request.errors.length > 0) {
-        try {
-            await fs.rename(request.screenshot, requestPath + "/screenshot.png");
-        } catch (e) {
-            await fs.writeFile(requestPath + "/screenshot.png", await fs.readFile(request.screenshot));
-            await fs.delete(request.screenshot);
-        }
+    try {
+        await fs.rename(request.screenshot, requestPath + "/screenshot.png");
+    } catch (e) {
+        await fs.writeFile(requestPath + "/screenshot.png", await fs.readFile(request.screenshot));
+        await fs.delete(request.screenshot);
     }
     delete request.screenshot;
     await fs.writeFile(requestPath + '/request.json', JSON.stringify(request));

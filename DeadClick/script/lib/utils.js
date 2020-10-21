@@ -57,10 +57,11 @@ function getErrorMessage(error) {
             return exception.preview.description.replace(exception.className + ": ", "");
         } else if (exception.value) {
             return exception.value;
-        } else {
+        } else if (exception.description) {
             return exception.description;
         }
-    } else if (exceptionDetails.text) {
+    }
+    if (exceptionDetails.text) {
         return exceptionDetails.text;
     }
     throw new Error(JSON.stringify(error));

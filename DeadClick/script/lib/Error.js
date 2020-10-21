@@ -13,8 +13,9 @@ class Error {
                 return exception.preview.description.replace(exception.className + ": ", "");
             } else if (exception.value) {
                 return exception.value;
+            } else if (exception.description) {
+                return exception.description;
             }
-            return exception.description;
         }
         if (exceptionDetails == null) {
             console.log(this)

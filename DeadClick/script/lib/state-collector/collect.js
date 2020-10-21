@@ -1,4 +1,4 @@
-const uuidv4 = require('uuid/v4');
+const uuidv4 = require('uuid').v4;
 const md5 = require('md5');
 const fs = require('async-file');
 const Sate = require('../State');

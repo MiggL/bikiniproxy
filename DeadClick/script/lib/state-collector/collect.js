@@ -56,7 +56,14 @@ async function saveRequest(request, requestsPath = utils.requestsPath) {
         await fs.writeFile(requestPath + "/screenshot.png", await fs.readFile(request.screenshot));
         await fs.delete(request.screenshot);
     }
+    try {
+        await fs.rename(request.loadedContent, requestPath + "/loadedContent.html");
+    } catch (e) {
+        await fs.writeFile(requestPath + "/loadedContent.html", await fs.readFile(request.loadedContent));
+        await fs.delete(request.loadedContent);
+    }
     delete request.screenshot;
+    delete request.loadedContent;
     await fs.writeFile(requestPath + '/request.json', JSON.stringify(request));
 }
 
@@ -106,18 +113,11 @@ async function collectPage(opts = {}) {
             await page.waitFor(opts.waitTime);
             if (opts.collectScreenShot) {
                 try {
-                    await new Promise((resolve,reject) => {
-                        tmp.file({postfix: ".png"}, async (err, path) => {
-                            output.screenshot = path;
-                            try {
-                                await page.screenshot({path: path, fullPage: true});
-                            } catch (e) {
-                                return reject(e);
-                            }
-                            resolve();
-                        });
-                    });
-                    await page.waitFor(1000);
+                    output.screenshot = tmp.fileSync({postfix: '.png'}).name;
+                    await page.screenshot({path: output.screenshot, fullPage: true});
+
+                    output.loadedContent = tmp.fileSync({postfix: '.html'}).name;
+                    await fs.writeFile(output.loadedContent, await page.content());
                 } catch (e) {
                     console.error("error", e);
                     return reject(e);

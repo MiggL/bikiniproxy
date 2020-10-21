@@ -15,21 +15,18 @@ async function close() {
 }
 
 async function getBrowser(proxy, extension) {
-    if (browser != null && (browser.nbRequest === 0 || browser.nbRequest % 100 !== 0)) {
+    if (browser != null) {
         return browser;
     }
     await close();
-    const args = [];
+    const args = ['--no-sandbox', '--disable-setuid-sandbox'];
     if (proxy) {
         args.push('--proxy-server=' + proxy);
         args.push('--ignore-certificate-errors')
     }
     if (extension) {
-        path_extension =  require('path').join(__dirname, '../../../chrome-extension/app');
-        
-
-        args.push('--disable-extensions-except=' + path_extension);
-        args.push('--load-extension=' + path_extension)
+        args.push('--disable-extensions-except=' + extension);
+        args.push('--load-extension=' + extension)
     }
 
     browser = await puppeteer.launch({

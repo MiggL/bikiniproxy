@@ -1,3 +1,11 @@
+#### This is my fork of BikiniProxy & DeadClick
+This fork includes an improved version of the line skipper.
+This fork also contains several changes to the DeadClick tools, making them usable with Privacy Badger.
+
+I am using this fork for my upcoming master thesis project: *Self-healing Javascript Errors Caused by Privacy Extensions*
+
+#### Original BikiniProxy README:
+
 # BikiniProxy 
 
 BikiniProxy is a novel technique to provide self-healing for the web.

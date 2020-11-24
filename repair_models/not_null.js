@@ -128,7 +128,20 @@ class NotNull extends RepairModel {
                     }
                 });
                 if (tmp != null) {
-                    node = tmp;
+                    //node = tmp;
+                    const siblingsToWrap = [];
+                    path.findParent(p => p.node.body).traverse({
+                        Identifier: p => {
+                            if (p.node.name == variable) {
+                                siblingsToWrap.push(p);
+                            }
+                        }
+                    });
+                    error.handled = siblingsToWrap.every(p => {
+                        const err = {};
+                        wrapNotDefinedIf(err, p.getStatementParent(), [p.node]);
+                        return err.handled
+                    });
                 } else {
                     if (t.isExpressionStatement(node)) {
                         node = node.expression;
@@ -139,8 +152,9 @@ class NotNull extends RepairModel {
                     if (t.isMemberExpression(node)) {
                         node = node.object;
                     }
+                    wrapNotDefinedIf(error, path.getStatementParent(), [node]);
                 }
-                wrapNotDefinedIf(error, path.getStatementParent(), [node]);
+                //wrapNotDefinedIf(error, path.getStatementParent(), [node]);
             } else if (t.isMemberExpression(path.parent)) {
                 createNullElement(error, path.getStatementParent(), [path.parent.object]);
             } else if (t.isAssignmentExpression(path.parent)) {

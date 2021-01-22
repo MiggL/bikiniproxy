@@ -64,6 +64,33 @@ class NotNull extends RepairModel {
                 console.error(e);
             }
         }
+        
+        function sameExpressionNode(e1, e2) {
+            if (e1.type !== e2.type) {
+                return false;
+            }
+            switch (e1.type) {
+                case 'CallExpression':
+                    return sameExpressionNode(e1.callee, e2.callee);
+                case 'MemberExpression':
+                    return e1.computed === e2.computed
+                        && sameExpressionNode(e1.object, e2.object)
+                        && sameExpressionNode(e1.property, e2.property);
+                case 'Identifier':
+                    return e1.name === e2.name;
+                case 'ThisExpression':
+                    return true;
+                case 'ExpressionStatement':
+                    return sameExpressionNode(e1.expression, e2.expression);
+                default:
+                    return false;
+            }
+        }
+        
+        function sameStatementParent(p1, p2) {
+            const ends = [p1, p2].map(p => p.getStatementParent().node.end);
+            return ends[0] == ends[1];
+        }
 
         function wrapNotFunctionIf(error, statement, expressions) {
             let condition = null;
@@ -103,7 +130,24 @@ class NotNull extends RepairModel {
             let node = path.node;
             const message = error.getMessage();
             if (message.indexOf('is not a function') !== -1) {
-                wrapNotFunctionIf(error, path.getStatementParent(), [path.find(p => p.isCallExpression()).node.callee]);
+                const callExpr = path.find(p => p.isCallExpression());
+                const fparent = path.scope.getFunctionParent() || path.scope.getProgramParent();
+                let lastWrapped = null;
+                fparent.path.traverse({
+                    CallExpression: p => {
+                        if (sameExpressionNode(p.node, callExpr.node)) {
+                            if (lastWrapped == null) {
+                                if (sameStatementParent(p, path)) {
+                                    wrapNotFunctionIf(error, p.getStatementParent(), [p.node.callee]);
+                                    lastWrapped = p;
+                                }
+                            } else if (!sameStatementParent(p, lastWrapped)) {
+                                wrapNotFunctionIf({}, p.getStatementParent(), [p.node.callee]);
+                                lastWrapped = p;
+                            }
+                        }
+                    }
+                });
             } else if (message.indexOf('Cannot set property') !== -1 ||
                 message.indexOf('Cannot read property') !== -1) {
                 if (t.isMemberExpression(path.node)) {
@@ -128,20 +172,7 @@ class NotNull extends RepairModel {
                     }
                 });
                 if (tmp != null) {
-                    //node = tmp;
-                    const siblingsToWrap = [];
-                    path.findParent(p => p.node.body).traverse({
-                        Identifier: p => {
-                            if (p.node.name == variable) {
-                                siblingsToWrap.push(p);
-                            }
-                        }
-                    });
-                    error.handled = siblingsToWrap.every(p => {
-                        const err = {};
-                        wrapNotDefinedIf(err, p.getStatementParent(), [p.node]);
-                        return err.handled
-                    });
+                    node = tmp;
                 } else {
                     if (t.isExpressionStatement(node)) {
                         node = node.expression;
@@ -152,9 +183,24 @@ class NotNull extends RepairModel {
                     if (t.isMemberExpression(node)) {
                         node = node.object;
                     }
-                    wrapNotDefinedIf(error, path.getStatementParent(), [node]);
                 }
-                //wrapNotDefinedIf(error, path.getStatementParent(), [node]);
+                let lastWrapped = null;
+                const fparent = path.scope.getFunctionParent() || path.scope.getProgramParent();
+                fparent.path.traverse({
+                    enter(p) {
+                        if (sameExpressionNode(p.node, node)) {
+                            if (lastWrapped == null) {
+                                if (sameStatementParent(p, path)) {
+                                    wrapNotDefinedIf(error, p.getStatementParent(), [p.node]);
+                                    lastWrapped = p;
+                                }
+                            } else if (!sameStatementParent(p, lastWrapped)) {
+                                wrapNotDefinedIf({}, p.getStatementParent(), [p.node]);
+                                lastWrapped = p;
+                            }
+                        }
+                    }
+                });
             } else if (t.isMemberExpression(path.parent)) {
                 createNullElement(error, path.getStatementParent(), [path.parent.object]);
             } else if (t.isAssignmentExpression(path.parent)) {

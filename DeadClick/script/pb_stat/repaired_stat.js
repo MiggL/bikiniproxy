@@ -6,7 +6,7 @@ const md5 = require('md5');
 const webtracesDir = '../../data_sep_2020/randomDuckduckgoUrls/webtraces/';
 const webtracesPbDir = path.join(webtracesDir, '../webtraces_pb/');
 const webtracesPbRepairedDir = path.join(webtracesDir, '../webtraces_pb_repaired/');
-const webtracesPbRepairedNewDir = path.join(webtracesDir, '../webtraces_pb_repaired_new/');
+const webtracesPbRepairedNewDir = path.join(webtracesDir, '../webtraces_pb_repaired_new_2_7/');
 const repairData = JSON.parse(fs.readFileSync(path.join(webtracesDir, '../from_proxy_data/repairData.json'), 'utf8'));
 
 function cleanErrorMessage(errorMessage) {
@@ -65,23 +65,22 @@ async function compareAll(urls/*md5s*/) {
   const healedUrls = [];
   const noRepairUrls = [];
 
+  const urlsWithMoreErrors = [];
+  const urlsWithLessErrors = [];
+  const urlsWithSameErrorAmount = [];
   const urlCountForRepairedPbErrorMessages = {};
 
+  //const promises = md5s.map(async md5 => {
   const promises = urls.map(async url => {
     // get data from files
     const expectedState = await utils.loadState(url/*md5*/, webtracesDir);
+    //const url = expectedState.url;
     if (expectedState.reproduced && expectedState.reproduced.identical === false) {
       return;
     }
     const repairedState = await utils.loadState(url, webtracesPbRepairedDir);
-    const otherRepairedState = await utils.loadState(url, webtracesPbRepairedNewDir);
-    if (!repairedState || repairedState.requests.filter(r => r.url == (url.endsWith('#!') ? url.slice(0, -2) : url) && r.method == 'GET')[0].status >= 400) {
-      if (!otherRepairedState || otherRepairedState.requests.filter(r => r.url == (url.endsWith('#!') ? url.slice(0, -2) : url) && r.method == 'GET')[0].status >= 400) {
-        //console.log('Fault in dataset?');
-        notPassedUrls.push(url);
-      } else {
-        repairTimeout.push(url);
-      }
+    if (!repairedState) {
+      notPassedUrls.push(url);
       return;
     }
 
@@ -101,6 +100,7 @@ async function compareAll(urls/*md5s*/) {
     urlRepairs.forEach(({ error }) => {
       samePbErrs = pbErr.filter(pbE => error.timestamp === pbE.timestamp && error.exceptionDetails.exceptionId === pbE.exceptionDetails.exceptionId);
       if (samePbErrs.length == 0) return;
+      targetedPbErrors = true;
       const msg = samePbErrs[0].getMessage();
       const removedErrorsOfMsg = pbErr.filter(e => e.getMessage() == msg).length - pbErrAfterRepair.filter(e => e.getMessage() == msg).length;
       if (removedErrorsOfMsg > 0) {
@@ -111,6 +111,15 @@ async function compareAll(urls/*md5s*/) {
       }
     });
     if (repairedPbErrorMessages.length != 0) healedUrls.push(url);
+    if (urlRepairs.length != 0) {
+      if (repairedState.errors.length > pbState.errors.length) {
+        urlsWithMoreErrors.push(url);
+      } else if (repairedState.errors.length < pbState.errors.length) {
+        urlsWithLessErrors.push(url);
+      } else {
+        urlsWithSameErrorAmount.push(url);
+      }
+    }
     healedPbErrorMessages.push(...repairedPbErrorMessages.map(cleanErrorMessage));
     urlRepairedPbErrorMessages.forEach(msg => {
       urlCountForRepairedPbErrorMessages[msg] = urlCountForRepairedPbErrorMessages[msg] + 1 || 1;
@@ -130,6 +139,10 @@ async function compareAll(urls/*md5s*/) {
   console.log('\nhealedPbErrMsgStats:');
   console.log(healedPbErrMsgStats);
   console.log('Healed errors:', healedPbErrorMessages.length);
+  
+  console.log(`\n${urlsWithMoreErrors.length} urls have more errors after repair when browsing with Privacy Badger`);
+  console.log(`${urlsWithLessErrors.length} urls have less errors after repair when browsing with Privacy Badger`);
+  console.log(`${urlsWithSameErrorAmount.length} urls have the same amount of errors after repair when browsing with Privacy Badger`);
 }
 
 (async () => {

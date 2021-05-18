@@ -3,10 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const md5 = require('md5');
 
-const webtracesDir = '../data_sep_2020/randomDuckduckgoUrls/webtraces/';
+const webtracesDir = '../../data_sep_2020/randomDuckduckgoUrls/webtraces/';
 const webtracesPbDir = path.join(webtracesDir, '../webtraces_pb/');
 const webtracesPbRepairedDir = path.join(webtracesDir, '../webtraces_pb_repaired/');
-const webtracesPbRepairedNewDir = path.join(webtracesDir, '../webtraces_pb_repaired_new_2_7/');
+const webtracesPbRepairedNewDir = path.join(webtracesDir, '../webtraces_pb_repaired_new/');
 const repairData = JSON.parse(fs.readFileSync(path.join(webtracesDir, '../from_proxy_data/repairData.json'), 'utf8'));
 
 function cleanErrorMessage(errorMessage) {

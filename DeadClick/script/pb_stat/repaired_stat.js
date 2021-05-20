@@ -3,11 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const md5 = require('md5');
 
+const improvedRepair = process.argv[2] == '2' || false;
+
 const webtracesDir = '../../data_sep_2020/randomDuckduckgoUrls/webtraces/';
 const webtracesPbDir = path.join(webtracesDir, '../webtraces_pb/');
-const webtracesPbRepairedDir = path.join(webtracesDir, '../webtraces_pb_repaired/');
-const webtracesPbRepairedNewDir = path.join(webtracesDir, '../webtraces_pb_repaired_new_2_7/');
-const repairData = JSON.parse(fs.readFileSync(path.join(webtracesDir, '../from_proxy_data/repairData.json'), 'utf8'));
+//const webtracesPbRepairedDir = path.join(webtracesDir, '../webtraces_pb_repaired/');
+const webtracesPbRepairedDir = path.join(webtracesDir, `../repaired${improvedRepair?'2':''}_webtraces_pb/`);
+//const webtracesPbRepairedNewDir = path.join(webtracesDir, '../webtraces_pb_repaired_new/');
+//const repairData = JSON.parse(fs.readFileSync(path.join(webtracesDir, '../from_proxy_data/repairData.json'), 'utf8'));
+const repairData = JSON.parse(fs.readFileSync(path.join(__dirname, `repairData.json`), 'utf8'));
 
 function cleanErrorMessage(errorMessage) {
   if (errorMessage.indexOf((" is not defined")) != -1) {
@@ -41,7 +45,7 @@ function cleanErrorMessage(errorMessage) {
   } else if (errorMessage.indexOf(("etwork")) != -1 ) {
     return "Network error";
   }
-  return errorMessage;//.replace(/\'?\"?https?:\/\/[^\s]+/g, "XXX");
+  return errorMessage;
 }
 
 function extractAddedErrors(expectedErrors, errors) {
@@ -67,6 +71,7 @@ async function compareAll(urls/*md5s*/) {
 
   const urlsWithMoreErrors = [];
   const urlsWithLessErrors = [];
+  const lessErrorsAfterPbRepair = [];
   const urlsWithSameErrorAmount = [];
   const urlCountForRepairedPbErrorMessages = {};
 
@@ -97,6 +102,7 @@ async function compareAll(urls/*md5s*/) {
     const urlRepairs = repairData.filter(rd => rd.url === url)[0].repairs;
     const repairedPbErrorMessages = [];
     const urlRepairedPbErrorMessages = new Set();
+    let targetedPbErrors = false;
     urlRepairs.forEach(({ error }) => {
       samePbErrs = pbErr.filter(pbE => error.timestamp === pbE.timestamp && error.exceptionDetails.exceptionId === pbE.exceptionDetails.exceptionId);
       if (samePbErrs.length == 0) return;
@@ -116,6 +122,9 @@ async function compareAll(urls/*md5s*/) {
         urlsWithMoreErrors.push(url);
       } else if (repairedState.errors.length < pbState.errors.length) {
         urlsWithLessErrors.push(url);
+        if (targetedPbErrors) {
+          lessErrorsAfterPbRepair.push(url);
+        }
       } else {
         urlsWithSameErrorAmount.push(url);
       }
@@ -143,6 +152,9 @@ async function compareAll(urls/*md5s*/) {
   console.log(`\n${urlsWithMoreErrors.length} urls have more errors after repair when browsing with Privacy Badger`);
   console.log(`${urlsWithLessErrors.length} urls have less errors after repair when browsing with Privacy Badger`);
   console.log(`${urlsWithSameErrorAmount.length} urls have the same amount of errors after repair when browsing with Privacy Badger`);
+
+  console.log(`${lessErrorsAfterPbRepair.length} urls have less errors after repairing errors caused by Privacy Badger`);
+  //fs.writeFileSync(`lessErrorsAfterPbRepair${improvedRepair?'2':''}.json`, JSON.stringify(lessErrorsAfterPbRepair, null, 2));
 }
 
 (async () => {

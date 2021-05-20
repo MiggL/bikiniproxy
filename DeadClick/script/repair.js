@@ -23,8 +23,8 @@ function isJavascriptRequest(contentType) {
   return contentTypeMatch;
 }
 
-async function repairUrls(urls, savePath, requestsPath = utils.requestsPath) {
-  const proxy = await reproductionProxy.startReproductionProxy(8010, requestsPath);
+async function repairUrls(urls, savePath, webtracesPath = utils.requestsPath, errorsPath = utils.requestsPath) {
+  const proxy = await reproductionProxy.startReproductionProxy(8010, webtracesPath);
 
   let repairOutput = [];
   proxy.onRequest = async function(request) {
@@ -55,28 +55,33 @@ async function repairUrls(urls, savePath, requestsPath = utils.requestsPath) {
         const isToApply = await repairModel.isToApply();
         if (isEnable && isToApply) {
           await repairModel.repair();
-          console.log('bingo');
           const output = { url: request.url, name: repairModel.name, description: repairModel.description, enable: isEnable, isToApply: isEnable ? isToApply : false, error: error };
-          //console.log(output);
           repairOutput.push(output);
-          // console.log(error.exceptionDetails);
         }
       }
     }
     return request;
   }
+  // If using an old version of Privacy Badger with local learning, uncomment the code below and manually import the training data.
+  /*
+  proxy.requestState = await utils.loadState(urls[0], webtracesPath);
+  await getState(urls[0], 'localhost:' + proxy.port, path.join(__dirname, '../../privacy-badger/2020.8.25_0'));
+  proxy.requestState = await utils.loadState(urls[0], webtracesPath);
+  await getState(urls[0], 'localhost:' + proxy.port, path.join(__dirname, '../../privacy-badger/2020.8.25_0'));
+  //*/
 
   for (let i = 0; i < urls.length; i++) {
     const url = urls[i];
     console.log('\nAttempting repair on url ' + (i + 1) + '/' + urls.length);
     console.log(url);
     try {
-      const originalState = await utils.loadState(url, path.join(requestsPath, '../webtraces/'));
+      const originalState = await utils.loadState(url, webtracesPath);
       console.log('Errors without Privacy Badger = ' + originalState.errors.length);
-      const expectedState = await utils.loadState(url, requestsPath);
+      const expectedState = await utils.loadState(url, errorsPath);
       console.log('Errors with Privacy Badger =    ' + expectedState.errors.length);
       // console.log(await reproductionProxy.reproduceRequestState(expectedState, proxy));
-      proxy.requestState = expectedState;
+      originalState.errors = expectedState.errors;
+      proxy.requestState = originalState;
       const collectedState = await getState(url, 'localhost:' + proxy.port, path.join(__dirname, '../../privacy-badger/2020.8.25_0'));
       console.log('Errors after repair =           ' + collectedState.errors.length);
       if (savePath) {
@@ -84,15 +89,13 @@ async function repairUrls(urls, savePath, requestsPath = utils.requestsPath) {
       }
 
       // add repair data to file
-      const repairDataFile = path.join(requestsPath, '../from_proxy_data/repairData.json');
+      const repairDataFile = path.join(__dirname, 'pb_stat/repairData.json');
+      const urlRepairs = JSON.parse(JSON.stringify(repairOutput)); // do not use repairOutput directly because of race condition
+      const u = url;
       fs.readFile(repairDataFile, (err, data) => {
-        let repairsArray = err ? [] : JSON.parse(data); // err should only occur if file doesn't exist
-        if (repairsArray.filter(r => r.url === url).length != 0) {
-          repairsArray = repairsArray.map(r => if (r.url === url) r.repairs = repairOutput);
-        } else {
-          repairsArray.push({url: url, repairs: repairOutput});
-        }
-        fs.writeFileSync(repairDataFile, JSON.stringify(repairsArray, null, 2));
+        const repairsObj = err ? {} : JSON.parse(data); // err should only occur if file doesn't exist
+        repairsObj[u] = urlRepairs;
+        fs.writeFileSync(repairDataFile, JSON.stringify(repairsObj, null, 2));
       });
 
       repairOutput = [];
@@ -106,9 +109,9 @@ async function repairUrls(urls, savePath, requestsPath = utils.requestsPath) {
 (async () => {
   const dataDir = '../data_sep_2020/randomDuckduckgoUrls';
   const webtracesPbDir = path.join(dataDir, 'webtraces_pb/');
-  const webtracesPbRepairedDir = path.join(dataDir, 'webtraces_pb_repaired_new/');
-  const urls = JSON.parse(fs.readFileSync(path.join(dataDir, 'from_proxy_data/pbErrorUrls.json')));
-  await repairUrls(urls, webtracesPbRepairedDir, webtracesPbDir);
+  const webtracesPbRepairedDir = path.join(dataDir, 'repaired_webtraces_pb/');
+  const urls = JSON.parse(fs.readFileSync(path.join(__dirname, 'pb_stat/reproducedUrls.json')));
+  await repairUrls(urls, webtracesPbRepairedDir, path.join(dataDir, 'webtraces/'), webtracesPbDir);
   await utils.closeBrowser();
   process.exit(0);
 })();

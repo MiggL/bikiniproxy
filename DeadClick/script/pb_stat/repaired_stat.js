@@ -5,12 +5,9 @@ const md5 = require('md5');
 
 const improvedRepair = process.argv[2] == '2' || false;
 
-const webtracesDir = '../../data_sep_2020/randomDuckduckgoUrls/webtraces/';
+const webtracesDir = path.join(__dirname, 'data_sep_2020/webtraces/');
 const webtracesPbDir = path.join(webtracesDir, '../webtraces_pb/');
-//const webtracesPbRepairedDir = path.join(webtracesDir, '../webtraces_pb_repaired/');
 const webtracesPbRepairedDir = path.join(webtracesDir, `../repaired${improvedRepair?'2':''}_webtraces_pb/`);
-//const webtracesPbRepairedNewDir = path.join(webtracesDir, '../webtraces_pb_repaired_new/');
-//const repairData = JSON.parse(fs.readFileSync(path.join(webtracesDir, '../from_proxy_data/repairData.json'), 'utf8'));
 const repairData = JSON.parse(fs.readFileSync(path.join(__dirname, `repairData.json`), 'utf8'));
 
 function cleanErrorMessage(errorMessage) {
@@ -59,12 +56,10 @@ function extractAddedErrors(expectedErrors, errors) {
 }
 
 async function compareAll(urls/*md5s*/) {
-  const notPassedUrls = [];
-  const repairTimeout = [];
-
   const increasedErrorsAfterRepair = [];
   const pbErrors = [];
   const pbErrorUrls = [];
+  const urlCountForPbErrorMessages = {};
   const healedPbErrorMessages = [];
   const healedUrls = [];
   const noRepairUrls = [];
@@ -83,11 +78,6 @@ async function compareAll(urls/*md5s*/) {
     if (expectedState.reproduced && expectedState.reproduced.identical === false) {
       return;
     }
-    const repairedState = await utils.loadState(url, webtracesPbRepairedDir);
-    if (!repairedState) {
-      notPassedUrls.push(url);
-      return;
-    }
 
     // errors caused by Privacy Badger
     const pbState = await utils.loadState(url, webtracesPbDir);
@@ -96,10 +86,18 @@ async function compareAll(urls/*md5s*/) {
     if (pbErr.length != 0) {
       pbErrorUrls.push(url);
     }
+    new Set(pbErr.map(e => cleanErrorMessage(e.getMessage()))).forEach(msg => {
+      urlCountForPbErrorMessages[msg] = urlCountForPbErrorMessages[msg] + 1 || 1;
+    });
 
     // healed errors caused by Privacy Badger
+    const repairedState = await utils.loadState(url, webtracesPbRepairedDir);
+    if (!repairedState) {
+      //notPassedUrls.push(url);
+      return;
+    }
     pbErrAfterRepair = extractAddedErrors(expectedState.errors, repairedState.errors);
-    const urlRepairs = repairData.filter(rd => rd.url === url)[0].repairs;
+    const urlRepairs = repairData[url];
     const repairedPbErrorMessages = [];
     const urlRepairedPbErrorMessages = new Set();
     let targetedPbErrors = false;
@@ -135,11 +133,22 @@ async function compareAll(urls/*md5s*/) {
     });
   });
   await Promise.all(promises);
+  console.log(`Stats on ${pbErrors.length} errors caused by Privacy Badger on ${pbErrorUrls.length} urls.`);
+  // Don't print stats for all pb error messages, only print stats for the types that were repaired.
+  const urlCountForPbErrorMessagesShort = {};
+  const pbErrMsgCount = {};
+  Object.keys(urlCountForRepairedPbErrorMessages).forEach(msg => {
+    urlCountForPbErrorMessagesShort[msg] = urlCountForPbErrorMessages[msg];
+    pbErrMsgCount[msg] = pbErrors.filter(e => cleanErrorMessage(e.getMessage()) == msg).length;
+  });
+  console.log('url count for different error types caused by Privacy Badger:');
+  console.log(urlCountForPbErrorMessagesShort)
+  console.log('Errors caused by Privacy Badger (only repairable types):');
+  console.log(pbErrMsgCount);
 
-  console.log('urlCountForRepairedPbErrorMessages:');
+  console.log('url count for repaired PB error messages:');
   console.log(urlCountForRepairedPbErrorMessages);
   console.log('Healed urls:', healedUrls.length);
-  //console.log(healedUrls.map(url => [url, md5(url)]));
 
   const healedPbErrMsgStats = {};
   for (const msg of new Set(healedPbErrorMessages)) {
@@ -158,7 +167,7 @@ async function compareAll(urls/*md5s*/) {
 }
 
 (async () => {
-  const urls = repairData.filter(rd => rd.repairs.length != 0).map(rd => rd.url);
+  const urls = Object.keys(repairData);//.filter(rd => rd.repairs.length != 0).map(rd => rd.url);
   //const md5s = fs.readdirSync(webtracesPbRepairedDir);
   await compareAll(urls);
 })();

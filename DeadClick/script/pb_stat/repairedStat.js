@@ -70,11 +70,9 @@ async function compareAll(urls/*md5s*/) {
   const urlsWithSameErrorAmount = [];
   const urlCountForRepairedPbErrorMessages = {};
 
-  //const promises = md5s.map(async md5 => {
   const promises = urls.map(async url => {
     // get data from files
-    const expectedState = await utils.loadState(url/*md5*/, webtracesDir);
-    //const url = expectedState.url;
+    const expectedState = await utils.loadState(url, webtracesDir);
     if (expectedState.reproduced && expectedState.reproduced.identical === false) {
       return;
     }
@@ -87,13 +85,17 @@ async function compareAll(urls/*md5s*/) {
       pbErrorUrls.push(url);
     }
     new Set(pbErr.map(e => cleanErrorMessage(e.getMessage()))).forEach(msg => {
-      urlCountForPbErrorMessages[msg] = urlCountForPbErrorMessages[msg] + 1 || 1;
+      if (urlCountForPbErrorMessages[msg]) {
+        urlCountForPbErrorMessages[msg].push(url);
+      } else {
+        urlCountForPbErrorMessages[msg] = [url];
+      }
+      //urlCountForPbErrorMessages[msg] = urlCountForPbErrorMessages[msg] + 1 || 1;
     });
 
     // healed errors caused by Privacy Badger
     const repairedState = await utils.loadState(url, webtracesPbRepairedDir);
     if (!repairedState) {
-      //notPassedUrls.push(url);
       return;
     }
     pbErrAfterRepair = extractAddedErrors(expectedState.errors, repairedState.errors);
@@ -137,12 +139,15 @@ async function compareAll(urls/*md5s*/) {
   // Don't print stats for all pb error messages, only print stats for the types that were repaired.
   const urlCountForPbErrorMessagesShort = {};
   const pbErrMsgCount = {};
+  const urlsForPrintedMsgs = new Set();
   Object.keys(urlCountForRepairedPbErrorMessages).forEach(msg => {
-    urlCountForPbErrorMessagesShort[msg] = urlCountForPbErrorMessages[msg];
+    urlCountForPbErrorMessagesShort[msg] = urlCountForPbErrorMessages[msg].length;
     pbErrMsgCount[msg] = pbErrors.filter(e => cleanErrorMessage(e.getMessage()) == msg).length;
+    urlCountForPbErrorMessages[msg].forEach(url => urlsForPrintedMsgs.add(url));
   });
-  console.log('url count for different error types caused by Privacy Badger:');
+  console.log('url count for error types caused by Privacy Badger (only repairable types):');
   console.log(urlCountForPbErrorMessagesShort)
+  console.log('total urls with these error messages:', urlsForPrintedMsgs.size);
   console.log('Errors caused by Privacy Badger (only repairable types):');
   console.log(pbErrMsgCount);
 
@@ -167,7 +172,6 @@ async function compareAll(urls/*md5s*/) {
 }
 
 (async () => {
-  const urls = Object.keys(repairData);//.filter(rd => rd.repairs.length != 0).map(rd => rd.url);
-  //const md5s = fs.readdirSync(webtracesPbRepairedDir);
+  const urls = Object.keys(repairData);
   await compareAll(urls);
 })();

@@ -2,7 +2,7 @@
 This fork includes an improved version of the line skipper.
 This fork also contains several changes to the DeadClick tools, making them usable with Privacy Badger.
 
-I am using this fork for my upcoming master thesis project: *Self-healing Javascript Errors Caused by Privacy Extensions*
+I am using this fork for my master thesis: *Healing Javascript Errors Caused by Privacy Extensions*
 
 #### Original BikiniProxy README:
 

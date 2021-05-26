@@ -1,3 +1,11 @@
+## This is my fork of the DeadClick tools
+I'm using it to study Javascript errors caused by [Privacy Badger](https://privacybadger.org/).
+The tools have been customized to work with Privacy Badger, and additional scripts have been added in `script` and `script/pb_stat`.
+- `script/fetchPbInducedErrors.js` takes a list of urls to visit, downloads all resources into the reproducible environment, and visits the reproduced web pages while using Privacy Badger, saving all resources and errors.
+- `script/repair.js` repairs the urls using BikiniProxy and visits them while using Privacy Badger, saving all requests and errors.
+- `script/pb_stat` contains scripts used to generate statistics on Javascript errors caused by Privacy Badger, and healed by BikiniProxy. The generated statistics in this folder are based on the urls found in `script/pb_stat/collectedDuckduckgoUrls.json` that were visited in September and October 2020. Raw error data is stored in [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4776903.svg)](https://doi.org/10.5281/zenodo.4776903)
+
+#### Original DeadClick README:
 # DeadClick
 
 DeadClick is a novel benchmark of JavaScript errors that are triggered in large production web applications.
